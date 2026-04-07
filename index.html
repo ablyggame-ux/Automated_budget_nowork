@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vibe Budget - Galaxy Tab Edition</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0d1117;
+            --neon-blue: #38bdf8;
+            --neon-orange: #fb923c;
+            --neon-green: #4ade80;
+            --neon-yellow: #facc15;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: #e6edf3;
+            font-family: 'JetBrains Mono', monospace;
+            overflow-x: hidden;
+        }
+
+        /* Animation d'apparition des bulles */
+        @keyframes pop {
+            0% { transform: scale(0) translate(-50%, -50%); opacity: 0; }
+            80% { transform: scale(1.1) translate(-50%, -50%); }
+            100% { transform: scale(1) translate(-50%, -50%); opacity: 1; }
+        }
+
+        .bubble {
+            animation: pop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+            position: absolute;
+            left: 50%;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            border: 2px solid transparent;
+            z-index: 20;
+        }
+
+        .bubble:hover {
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
+            filter: brightness(1.2);
+        }
+
+        .bubble-validated { background: rgba(56, 189, 248, 0.2); border-color: var(--neon-blue); color: var(--neon-blue); }
+        .bubble-pending { background: rgba(251, 146, 60, 0.2); border-color: var(--neon-orange); color: var(--neon-orange); }
+
+        /* Lignes de repère */
+        #svg-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        .timeline-center {
+            position: absolute;
+            left: 50%;
+            width: 2px;
+            height: 10000px; /* Longue ligne */
+            background: linear-gradient(to bottom, transparent, #30363d, transparent);
+            transform: translateX(-50%);
+            z-index: 5;
+        }
+
+        /* Verre dépoli pour les détails */
+        .glass-panel {
+            background: rgba(13, 17, 23, 0.8);
+            backdrop-filter: blur(10px);
+            border: 1px solid #30363d;
+        }
+    </style>
+</head>
+<body class="min-h-screen">
+
+    <!-- Arrière-plan SVG pour les courbes -->
+    <svg id="svg-bg" preserveAspectRatio="none">
+        <!-- Ligne Optimale (Verte, Droite) -->
+        <line id="line-optimal" x1="40%" y1="0" x2="40%" y2="100%" stroke="#4ade80" stroke-width="1" stroke-dasharray="5,5" opacity="0.4" />
+        <!-- Ligne Réaliste (Jaune, Sinusoïdale) -->
+        <path id="line-realistic" fill="none" stroke="#facc15" stroke-width="2" opacity="0.6" />
+    </svg>
+
+    <!-- Header Fixe -->
+    <header class="fixed top-0 w-full p-6 z-50 flex justify-between items-center bg-gradient-to-b from-[#0d1117] to-transparent">
+        <div>
+            <h1 class="text-2xl font-bold tracking-tighter">VIBE<span class="text-blue-400">BUDGET</span></h1>
+            <p class="text-xs opacity-50 uppercase tracking-widest">System Status: Optimal</p>
+        </div>
+        <div id="total-display" class="text-right">
+            <span class="text-sm opacity-50">Dépenses</span>
+            <div class="text-xl font-bold text-green-400" id="total-amount">0.00€</div>
+        </div>
+    </header>
+
+    <!-- Container de la Timeline -->
+    <main id="timeline-container" class="relative pt-[20vh] pb-[50vh] w-full min-h-screen">
+        <div class="timeline-center"></div>
+        <div id="bubbles-layer"></div>
+    </main>
+
+    <!-- Modal Détails (Caché par défaut) -->
+    <div id="modal" class="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 opacity-0 pointer-events-none transition-opacity duration-300">
+        <div class="glass-panel p-8 rounded-2xl w-80 text-center scale-90 transition-transform duration-300" id="modal-content">
+            <h2 id="modal-title" class="text-xl font-bold mb-2">Détail</h2>
+            <p id="modal-date" class="text-sm opacity-50 mb-4"></p>
+            <div id="modal-amount" class="text-4xl font-bold mb-6"></div>
+            <div id="modal-actions" class="flex flex-col gap-3">
+                <!-- Les boutons injectés ici -->
+            </div>
+            <button onclick="closeModal()" class="mt-6 text-xs uppercase opacity-30 hover:opacity-100">Fermer</button>
+        </div>
+    </div>
+
+    <script>
+                // CONFIGURATION
+        const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxr3RkcVPhgnFJUay-sPoLMzPNUvfwaV5_pzEzruJ_9zQaIx0s-huEwFXYwzIhufIsI/exec'; 
+        
+        let budgetData = [];
+        const container = document.getElementById('bubbles-layer');
+
+        function drawRealisticLine() {
+            const path = document.getElementById('line-realistic');
+            const width = window.innerWidth;
+            const height = Math.max(document.body.scrollHeight, window.innerHeight * 2);
+            let d = `M ${width * 0.6} 0`;
+            for (let y = 0; y <= height; y += 20) {
+                const x = (width * 0.6) + Math.sin(y / 100) * 30;
+                d += ` L ${x} ${y}`;
+            }
+            path.setAttribute('d', d);
+        }
+
+        async function fetchData() {
+            try {
+                const response = await fetch(SCRIPT_URL);
+                const rawData = await response.json();
+                
+                // TRI CHRONOLOGIQUE (Important pour le "Vibe")
+                budgetData = rawData.sort((a, b) => new Date(b.date) - new Date(a.date));
+                
+                renderTimeline();
+            } catch (e) {
+                console.error("Erreur de chargement:", e);
+                // Fallback demo si l'URL échoue
+                budgetData = [{ uid: "1", date: '2026-04-08', merchant: 'Erreur Connexion', amount: 0, status: 'Pending' }];
+                renderTimeline();
+            }
+        }
+
+        function renderTimeline() {
+            container.innerHTML = '';
+            let total = 0;
+            
+            budgetData.forEach((item, index) => {
+                total += parseFloat(item.amount);
+                const bubble = document.createElement('div');
+                
+                // Taille logarithmique selon montant
+                const size = Math.max(85, Math.min(200, 70 + Math.log10(Math.abs(item.amount) + 1) * 45));
+                const topPos = index * 200 + 150;
+                const side = index % 2 === 0 ? -1 : 1;
+                const xOffset = side * (100 + Math.random() * 30);
+
+                bubble.className = `bubble rounded-full ${item.status === 'Validated' ? 'bubble-validated' : 'bubble-pending'}`;
+                bubble.style.width = `${size}px`;
+                bubble.style.height = `${size}px`;
+                bubble.style.top = `${topPos}px`;
+                bubble.style.marginLeft = `${xOffset}px`;
+                bubble.style.animationDelay = `${index * 0.05}s`;
+
+                // On utilise .merchant au lieu de .label
+                bubble.innerHTML = `
+                    <div class="flex flex-col items-center p-2">
+                        <span class="text-[9px] uppercase font-bold opacity-60 leading-tight">${item.merchant.substring(0, 12)}</span>
+                        <span class="text-lg font-bold">${parseFloat(item.amount).toFixed(2)}€</span>
+                        <span class="text-[8px] opacity-40">${item.category || ''}</span>
+                    </div>
+                `;
+
+                bubble.onclick = () => showDetails(item);
+                container.appendChild(bubble);
+            });
+
+            document.getElementById('total-amount').innerText = `${total.toFixed(2)}€`;
+            drawRealisticLine();
+        }
+
+        function showDetails(item) {
+            const modal = document.getElementById('modal');
+            const content = document.getElementById('modal-content');
+            
+            document.getElementById('modal-title').innerText = item.merchant;
+            document.getElementById('modal-date').innerText = new Date(item.date).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+            document.getElementById('modal-amount').innerText = `${parseFloat(item.amount).toFixed(2)}€`;
+            
+            const actions = document.getElementById('modal-actions');
+            actions.innerHTML = '';
+
+            if(item.status === 'Pending') {
+                const btn = document.createElement('button');
+                btn.className = "w-full py-4 bg-orange-500 text-black font-bold rounded-xl active:scale-95 transition-transform";
+                btn.innerText = "VALIDER LA TRANSACTION";
+                // On passe l'UID pour la validation
+                btn.onclick = () => validateTransaction(item.uid);
+                actions.appendChild(btn);
+            } else {
+                actions.innerHTML = `<div class="text-blue-400 text-xs uppercase tracking-widest border border-blue-400/30 py-2 rounded-lg">✓ Validée</div>`;
+            }
+
+            modal.classList.remove('pointer-events-none', 'opacity-0');
+            content.classList.remove('scale-90');
+        }
+
+        function closeModal() {
+            document.getElementById('modal').classList.add('pointer-events-none', 'opacity-0');
+            document.getElementById('modal-content').classList.add('scale-90');
+        }
+
+        async function validateTransaction(uid) {
+            // UI Optimiste
+            const item = budgetData.find(d => d.uid === uid);
+            if(item) item.status = 'Validated';
+            renderTimeline();
+            closeModal();
+
+            try {
+                await fetch(SCRIPT_URL, {
+                    method: 'POST',
+                    mode: 'no-cors', // Important pour Google Apps Script
+                    body: JSON.stringify({ action: 'validate', uid: uid })
+                });
+            } catch(e) {
+                console.error("Erreur validation");
+            }
+        }
+
+        window.addEventListener('resize', drawRealisticLine);
+        fetchData();
+
+    </script>
+</body>
+</html>
