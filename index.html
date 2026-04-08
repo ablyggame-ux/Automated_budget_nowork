@@ -140,6 +140,41 @@
             path.setAttribute('d', d);
         }
 
+
+        const BUDGET_IDEAL = 1230;
+        const BUDGET_REEL_MOYEN = 1400;
+
+        function drawBudgetGuides() {
+            const svg = document.getElementById('svg-bg');
+            const width = window.innerWidth;
+            const height = Math.max(document.body.scrollHeight, window.innerHeight);
+            const centerX = width / 2;
+
+            // Calcul de la progression du mois (0 à 1)
+            const now = new Date();
+            const totalDays = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+            const currentDay = now.getDate();
+            const progress = currentDay / totalDays;
+
+            // 1. Ligne Optimale (Verte) : Part de 1230 et descend
+            const optLine = document.getElementById('line-optimal');
+            const optX = centerX - 150; // Décalage fixe à gauche pour le repère
+            optLine.setAttribute('x1', optX);
+            optLine.setAttribute('x2', optX);
+            optLine.setAttribute('y2', height);
+
+            // 2. Ligne Réaliste (Jaune) : Sinusoïdale autour de la tendance 1400
+            const realPath = document.getElementById('line-realistic');
+            let d = `M ${centerX + 150} 0`;
+            for (let y = 0; y <= height; y += 20) {
+                // L'oscillation simule tes variations de dépenses (Loyer, courses, etc.)
+                const x = (centerX + 150) + Math.sin(y / 150) * 40;
+                d += ` L ${x} ${y}`;
+            }
+            realPath.setAttribute('d', d);
+        }
+
+
         async function fetchData() {
             try {
                 const response = await fetch(SCRIPT_URL);
@@ -157,33 +192,67 @@
             }
         }
 
+
+
+
+
+
+        
+        function renderTimeline() {
         function renderTimeline() {
             container.innerHTML = '';
             let total = 0;
-            
-            budgetData.forEach((item, index) => {
-                total += parseFloat(item.amount);
-                const bubble = document.createElement('div');
-                
-                // Taille logarithmique selon montant
-                const size = Math.max(85, Math.min(200, 70 + Math.log10(Math.abs(item.amount) + 1) * 45));
-                const topPos = index * 200 + 150;
-                const side = index % 2 === 0 ? -1 : 1;
-                const xOffset = side * (100 + Math.random() * 30);
+    
+            // 1. Tri des données par date (la plus récente en haut)
+            const sortedData = budgetData.sort((a, b) => new Date(b.date) - new Date(a.date));
 
-                bubble.className = `bubble rounded-full ${item.status === 'Validated' ? 'bubble-validated' : 'bubble-pending'}`;
+            sortedData.forEach((item, index) => {
+                // Nettoyage et conversion du montant
+                let cleanAmount = String(item.amount).replace(/[^-0-9,.]/g, '').replace(',', '.');
+                let amount = parseFloat(cleanAmount) || 0;
+                total += amount;
+        
+                const itemDate = new Date(item.date);
+                const day = itemDate.getDate() || 1;
+        
+                // --- LOGIQUE DE POSITIONNEMENT ---
+        
+                // Position Y : Basée sur le jour du mois (150px d'écart par jour pour aérer)
+                // On inverse pour que le début du mois soit en haut
+                const topPos = day * 150; 
+
+                // Position X : Le "Vibe Check"
+                // On centre la timeline. 
+                // Si le montant est élevé, la bulle s'éloigne du centre.
+                // On alterne gauche/droite pour la lisibilité
+                const side = index % 2 === 0 ? -1 : 1;
+                const xOffset = side * (70 + Math.min(amount / 5, 150)); 
+
+                // Taille de la bulle (proportionnelle au montant)
+                const size = Math.max(85, Math.min(190, 75 + Math.log10(Math.abs(amount) + 1) * 45));
+
+                const bubble = document.createElement('div');
+        
+                // Style des bulles selon le statut et la source
+                let statusClass = item.status === 'Validated' ? 'bubble-validated' : 'bubble-pending';
+        
+                bubble.className = `bubble rounded-full ${statusClass}`;
                 bubble.style.width = `${size}px`;
                 bubble.style.height = `${size}px`;
                 bubble.style.top = `${topPos}px`;
                 bubble.style.marginLeft = `${xOffset}px`;
                 bubble.style.animationDelay = `${index * 0.05}s`;
 
-                // On utilise .merchant au lieu de .label
+                // Contenu de la bulle
                 bubble.innerHTML = `
                     <div class="flex flex-col items-center p-2">
-                        <span class="text-[9px] uppercase font-bold opacity-60 leading-tight">${item.merchant.substring(0, 12)}</span>
-                        <span class="text-lg font-bold">${parseFloat(item.amount).toFixed(2)}€</span>
-                        <span class="text-[8px] opacity-40">${item.category || ''}</span>
+                        <span class="text-[9px] uppercase font-bold opacity-60 leading-tight">
+                            ${(item.merchant || 'Inconnu').substring(0, 12)}
+                        </span>
+                        <span class="text-lg font-bold">${amount.toFixed(2)}€</span>
+                        <span class="text-[8px] opacity-40 uppercase tracking-tighter">
+                            ${item.category || item.source || ''}
+                        </span>
                     </div>
                 `;
 
@@ -191,9 +260,21 @@
                 container.appendChild(bubble);
             });
 
-            document.getElementById('total-amount').innerText = `${total.toFixed(2)}€`;
-            drawRealisticLine();
-        }
+            // Mise à jour du compteur total en haut à droite
+            const totalDisplay = document.getElementById('total-amount');
+            if (totalDisplay) {
+                totalDisplay.innerText = `${total.toFixed(2)}€`;
+                // Changement de couleur si on dépasse le budget idéal de 1230€
+                totalDisplay.style.color = total > 1230 ? '#facc15' : '#4ade80';
+            }
+
+            // Recalcul des lignes de repère (Guides 1230€ et 1400€)
+            if (typeof drawBudgetGuides === "function") {
+                drawBudgetGuides();
+            }
+        }            
+            
+            
 
         function showDetails(item) {
             const modal = document.getElementById('modal');
