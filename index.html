@@ -83,25 +83,31 @@
             let total = 0;
 
             budgetData.forEach((item, i) => {
-                // Extraction ultra-robuste des données (insensible aux majuscules)
-                const amount = parseFloat(String(item.amount || item.Amount || 0).replace(',', '.')) || 0;
-                const merchant = item.merchant || item.Merchant || item.label || "Inconnu";
-                const dateRaw = item.date || item.Date || new Date();
-                const status = (item.status || item.Status || "Pending").toLowerCase();
+                // MÉTHODE RIGOUREUSE : On récupère les valeurs brutes dans l'ordre du tableau
+                // car ton JSON semble utiliser les valeurs des cellules comme clés.
+                const values = Object.values(item); 
                 
+                // On part du principe que :
+                // values[0] = UID, values[1] = Date, values[2] = Montant, values[3] = Marchand
+                const rawDate = values[1];
+                const rawAmount = values[2];
+                const merchant = values[3] || "Inconnu";
+                const status = String(values[6] || "").toLowerCase();
+                
+                // Nettoyage forcé du montant
+                const amount = parseFloat(String(rawAmount).replace(/[^-0-9,.]/g, '').replace(',', '.')) || 0;
                 total += amount;
 
-                const date = new Date(dateRaw);
-                const day = date.getDate() || 1;
+                const date = new Date(rawDate);
+                const day = date.getDate() || (i % 30) + 1; // Fallback si la date est illisible
                 
-                // Positionnement
                 const top = day * 140; 
                 const side = i % 2 === 0 ? -1 : 1;
                 const xOffset = side * (70 + Math.min(amount / 5, 120));
-                const size = Math.max(80, Math.min(180, 70 + Math.log10(Math.abs(amount) + 1) * 40));
+                const size = Math.max(85, Math.min(180, 75 + Math.log10(Math.abs(amount) + 1) * 40));
 
                 const b = document.createElement('div');
-                b.className = `bubble rounded-full ${status === 'validated' ? 'bubble-validated' : 'bubble-pending'}`;
+                b.className = `bubble rounded-full ${status.includes('pend') ? 'bubble-pending' : 'bubble-validated'}`;
                 b.style.width = `${size}px`;
                 b.style.height = `${size}px`;
                 b.style.top = `${top}px`;
@@ -118,10 +124,8 @@
 
             totalEl.innerText = `${total.toFixed(2)}€`;
             totalEl.style.color = total > 1230 ? '#facc15' : '#4ade80';
-            
             drawGuides();
         }
-
         function drawGuides() {
             const centerX = window.innerWidth / 2;
             const height = document.body.scrollHeight;
