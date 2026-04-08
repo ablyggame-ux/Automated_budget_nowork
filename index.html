@@ -3,266 +3,147 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vibe Budget - Galaxy Tab Edition</title>
+    <title>Vibe Budget - Système de Pilotage</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;700&display=swap" rel="stylesheet">
     <style>
-        :root {
-            --bg-color: #0d1117;
-            --neon-blue: #38bdf8;
-            --neon-orange: #fb923c;
-            --neon-green: #4ade80;
-            --neon-yellow: #facc15;
-        }
-
-        body {
-            background-color: var(--bg-color);
-            color: #e6edf3;
-            font-family: 'JetBrains Mono', monospace;
-            overflow-x: hidden;
-        }
-
+        :root { --bg-color: #0d1117; --neon-blue: #38bdf8; --neon-orange: #fb923c; --neon-green: #4ade80; --neon-yellow: #facc15; }
+        body { background-color: var(--bg-color); color: #e6edf3; font-family: 'JetBrains Mono', monospace; overflow-x: hidden; }
+        
         @keyframes pop {
             0% { transform: scale(0) translate(-50%, -50%); opacity: 0; }
-            80% { transform: scale(1.1) translate(-50%, -50%); }
             100% { transform: scale(1) translate(-50%, -50%); opacity: 1; }
         }
 
         .bubble {
-            animation: pop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
-            position: absolute;
-            left: 50%;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            text-align: center;
-            border: 2px solid transparent;
-            z-index: 20;
+            animation: pop 0.4s ease-out forwards;
+            position: absolute; left: 50%; cursor: pointer; transition: all 0.3s ease;
+            display: flex; align-items: center; justify-content: center; text-align: center;
+            border: 2px solid transparent; z-index: 20;
         }
 
-        .bubble:hover {
-            box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
-            filter: brightness(1.2);
-        }
+        .bubble-validated { background: rgba(56, 189, 248, 0.15); border-color: var(--neon-blue); color: var(--neon-blue); }
+        .bubble-pending { background: rgba(251, 146, 60, 0.15); border-color: var(--neon-orange); color: var(--neon-orange); border-style: dashed; }
 
-        .bubble-validated { background: rgba(56, 189, 248, 0.2); border-color: var(--neon-blue); color: var(--neon-blue); }
-        .bubble-pending { background: rgba(251, 146, 60, 0.2); border-color: var(--neon-orange); color: var(--neon-orange); }
-
-        #svg-bg {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 1;
-            pointer-events: none;
-        }
-
-        .timeline-center {
-            position: absolute;
-            left: 50%;
-            width: 2px;
-            height: 10000px;
-            background: linear-gradient(to bottom, transparent, #30363d, transparent);
-            transform: translateX(-50%);
-            z-index: 5;
-        }
-
-        .glass-panel {
-            background: rgba(13, 17, 23, 0.8);
-            backdrop-filter: blur(10px);
-            border: 1px solid #30363d;
-        }
+        #svg-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; }
+        .timeline-center { position: absolute; left: 50%; width: 2px; height: 5000px; background: rgba(255,255,255,0.05); transform: translateX(-50%); z-index: 5; }
     </style>
 </head>
-<body class="min-h-screen">
+<body>
 
     <svg id="svg-bg" preserveAspectRatio="none">
-        <line id="line-optimal" x1="0" y1="0" x2="0" y2="100%" stroke="#4ade80" stroke-width="2" stroke-dasharray="8,4" opacity="0.5" />
-        <path id="line-realistic" fill="none" stroke="#facc15" stroke-width="2" opacity="0.4" />
+        <line id="line-optimal" x1="0" y1="0" x2="0" y2="100%" stroke="#4ade80" stroke-width="1" stroke-dasharray="10,5" opacity="0.3" />
+        <path id="line-realistic" fill="none" stroke="#facc15" stroke-width="1.5" opacity="0.3" />
     </svg>
 
-    <header class="fixed top-0 w-full p-6 z-50 flex justify-between items-center bg-gradient-to-b from-[#0d1117] to-transparent">
+    <header class="fixed top-0 w-full p-6 z-50 flex justify-between items-start bg-gradient-to-b from-[#0d1117] via-[#0d1117]/80 to-transparent">
         <div>
-            <h1 class="text-2xl font-bold tracking-tighter">VIBE<span class="text-blue-400">BUDGET</span></h1>
-            <p class="text-xs opacity-50 uppercase tracking-widest">Status: Monitoring</p>
+            <h1 class="text-xl font-bold tracking-tighter">VIBE<span class="text-blue-400">BUDGET</span></h1>
+            <div id="debug-status" class="text-[10px] opacity-30 mt-1 uppercase">Connexion en cours...</div>
         </div>
-        <div id="total-display" class="text-right">
-            <span class="text-sm opacity-50">Dépenses Mois</span>
-            <div class="text-xl font-bold text-green-400" id="total-amount">0.00€</div>
+        <div class="text-right">
+            <span class="text-[10px] opacity-50 uppercase">Flux Mensuel</span>
+            <div id="total-amount" class="text-2xl font-bold text-white">0.00€</div>
         </div>
     </header>
 
-    <main id="timeline-container" class="relative pt-[20vh] pb-[50vh] w-full min-h-screen">
+    <main id="timeline-container" class="relative pt-[25vh] pb-[20vh] w-full min-h-screen">
         <div class="timeline-center"></div>
         <div id="bubbles-layer"></div>
     </main>
 
-    <div id="modal" class="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 opacity-0 pointer-events-none transition-opacity duration-300">
-        <div class="glass-panel p-8 rounded-2xl w-80 text-center scale-90 transition-transform duration-300" id="modal-content">
-            <h2 id="modal-title" class="text-xl font-bold mb-2 uppercase tracking-tighter">Détail</h2>
-            <p id="modal-date" class="text-sm opacity-50 mb-4"></p>
-            <div id="modal-amount" class="text-4xl font-bold mb-6"></div>
-            <div id="modal-actions" class="flex flex-col gap-3"></div>
-            <button onclick="closeModal()" class="mt-6 text-xs uppercase opacity-30 hover:opacity-100 italic">Fermer</button>
-        </div>
-    </div>
-
     <script>
-        const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxr3RkcVPhgnFJUay-sPoLMzPNUvfwaV5_pzEzruJ_9zQaIx0s-huEwFXYwzIhufIsI/exec'; 
+        const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxr3RkcVPhgnFJUay-sPoLMzPNUvfwaV5_pzEzruJ_9zQaIx0s-huEwFXYwzIhufIsI/exec';
         let budgetData = [];
-        const container = document.getElementById('bubbles-layer');
 
-        function drawBudgetGuides() {
-            const width = window.innerWidth;
-            const height = Math.max(document.body.scrollHeight, window.innerHeight);
-            const centerX = width / 2;
-
-            // Guide Idéal (Vert) à gauche
-            const optLine = document.getElementById('line-optimal');
-            optLine.setAttribute('x1', centerX - 160);
-            optLine.setAttribute('x2', centerX - 160);
-            optLine.setAttribute('y2', height);
-
-            // Guide Réaliste (Jaune) ondulé à droite
-            const realPath = document.getElementById('line-realistic');
-            let d = `M ${centerX + 160} 0`;
-            for (let y = 0; y <= height; y += 30) {
-                const x = (centerX + 160) + Math.sin(y / 200) * 25;
-                d += ` L ${x} ${y}`;
-            }
-            realPath.setAttribute('d', d);
-        }
-
-        async function fetchData() {
+        async function loadData() {
+            const status = document.getElementById('debug-status');
             try {
-                const response = await fetch(SCRIPT_URL);
-                const rawData = await response.json();
-                // Tri par date
-                budgetData = rawData.sort((a, b) => new Date(b.date || b.Date) - new Date(a.date || a.Date));
-                renderTimeline();
+                const r = await fetch(SCRIPT_URL);
+                const json = await r.json();
+                
+                if (!json || json.length === 0) {
+                    status.innerText = "ERREUR: TABLEAU VIDE";
+                    return;
+                }
+
+                budgetData = json;
+                status.innerText = `SYSTÈME ACTIF: ${json.length} ENTRÉES`;
+                render();
             } catch (e) {
-                console.error("Fetch Error:", e);
-                container.innerHTML = `<div class="text-center pt-20 opacity-20">ERREUR DE CONNEXION AU SYSTÈME</div>`;
+                status.innerText = "ERREUR DE CONNEXION";
+                console.error(e);
             }
         }
 
-        function renderTimeline() {
-            container.innerHTML = '';
+        function render() {
+            const layer = document.getElementById('bubbles-layer');
+            const totalEl = document.getElementById('total-amount');
+            layer.innerHTML = '';
             let total = 0;
 
-            budgetData.forEach((item, index) => {
-                // Nettoyage robuste du montant
-                let rawVal = item.amount || item.Amount || 0;
-                let cleanVal = String(rawVal).replace(/[^-0-9,.]/g, '').replace(',', '.');
-                let amount = parseFloat(cleanVal) || 0;
+            budgetData.forEach((item, i) => {
+                // Extraction ultra-robuste des données (insensible aux majuscules)
+                const amount = parseFloat(String(item.amount || item.Amount || 0).replace(',', '.')) || 0;
+                const merchant = item.merchant || item.Merchant || item.label || "Inconnu";
+                const dateRaw = item.date || item.Date || new Date();
+                const status = (item.status || item.Status || "Pending").toLowerCase();
+                
                 total += amount;
 
-                // Position temporelle
-                const itemDate = new Date(item.date || item.Date || new Date());
-                const day = itemDate.getDate() || 1;
-                const topPos = day * 160; 
-
-                // Position horizontale
-                const side = index % 2 === 0 ? -1 : 1;
-                const xOffset = side * (80 + Math.min(amount / 4, 140)); 
+                const date = new Date(dateRaw);
+                const day = date.getDate() || 1;
                 
-                // Taille de la bulle
-                const size = Math.max(90, Math.min(200, 80 + Math.log10(Math.abs(amount) + 1) * 45));
+                // Positionnement
+                const top = day * 140; 
+                const side = i % 2 === 0 ? -1 : 1;
+                const xOffset = side * (70 + Math.min(amount / 5, 120));
+                const size = Math.max(80, Math.min(180, 70 + Math.log10(Math.abs(amount) + 1) * 40));
 
-                const bubble = document.createElement('div');
-                const isPending = (item.status || item.Status || "").toLowerCase() === 'pending';
-                
-                bubble.className = `bubble rounded-full ${isPending ? 'bubble-pending' : 'bubble-validated'}`;
-                bubble.style.width = `${size}px`;
-                bubble.style.height = `${size}px`;
-                bubble.style.top = `${topPos}px`;
-                bubble.style.marginLeft = `${xOffset}px`;
-                bubble.style.animationDelay = `${index * 0.05}s`;
+                const b = document.createElement('div');
+                b.className = `bubble rounded-full ${status === 'validated' ? 'bubble-validated' : 'bubble-pending'}`;
+                b.style.width = `${size}px`;
+                b.style.height = `${size}px`;
+                b.style.top = `${top}px`;
+                b.style.marginLeft = `${xOffset}px`;
 
-                bubble.innerHTML = `
-                    <div class="flex flex-col items-center p-2 leading-tight">
-                        <span class="text-[9px] uppercase font-bold opacity-60 mb-1">
-                            ${(item.merchant || item.Merchant || 'Inconnu').substring(0, 12)}
-                        </span>
-                        <span class="text-lg font-bold">${amount.toFixed(2)}€</span>
-                        <span class="text-[8px] opacity-40 uppercase mt-1 tracking-widest">
-                            ${item.category || item.source || ''}
-                        </span>
+                b.innerHTML = `
+                    <div class="p-2 leading-none">
+                        <div class="text-[8px] uppercase opacity-60 mb-1">${String(merchant).substring(0, 10)}</div>
+                        <div class="text-sm font-bold">${amount.toFixed(2)}€</div>
                     </div>
                 `;
-
-                bubble.onclick = () => showDetails(item);
-                container.appendChild(bubble);
+                layer.appendChild(b);
             });
 
-            // Update Header
-            const totalDisplay = document.getElementById('total-amount');
-            totalDisplay.innerText = `${total.toFixed(2)}€`;
-            totalDisplay.style.color = total > 1230 ? '#facc15' : '#4ade80';
-
-            drawBudgetGuides();
+            totalEl.innerText = `${total.toFixed(2)}€`;
+            totalEl.style.color = total > 1230 ? '#facc15' : '#4ade80';
+            
+            drawGuides();
         }
 
-        function showDetails(item) {
-            const modal = document.getElementById('modal');
-            const content = document.getElementById('modal-content');
+        function drawGuides() {
+            const centerX = window.innerWidth / 2;
+            const height = document.body.scrollHeight;
             
-            let amount = parseFloat(String(item.amount || item.Amount).replace(',', '.')) || 0;
-            
-            document.getElementById('modal-title').innerText = item.merchant || item.Merchant || "Détail";
-            document.getElementById('modal-date').innerText = new Date(item.date || item.Date).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
-            document.getElementById('modal-amount').innerText = `${amount.toFixed(2)}€`;
-            
-            const actions = document.getElementById('modal-actions');
-            actions.innerHTML = '';
+            // Guide Idéal (1230€)
+            const opt = document.getElementById('line-optimal');
+            opt.setAttribute('x1', centerX - 160);
+            opt.setAttribute('x2', centerX - 160);
+            opt.setAttribute('y2', height);
 
-            const isPending = (item.status || item.Status || "").toLowerCase() === 'pending';
-            if(isPending) {
-                const btn = document.createElement('button');
-                btn.className = "w-full py-4 bg-orange-500 text-black font-bold rounded-xl active:scale-95 transition-all";
-                btn.innerText = "VALIDER LA TRANSACTION";
-                btn.onclick = () => validateTransaction(item.uid || item.UID);
-                actions.appendChild(btn);
-            } else {
-                actions.innerHTML = `<div class="text-blue-400 text-xs uppercase tracking-widest py-3 border border-blue-400/20 rounded-xl">✓ Transaction Archivée</div>`;
+            // Guide Réaliste (1400€)
+            const real = document.getElementById('line-realistic');
+            let d = `M ${centerX + 160} 0`;
+            for (let y = 0; y <= height; y += 40) {
+                const x = (centerX + 160) + Math.sin(y / 200) * 20;
+                d += ` L ${x} ${y}`;
             }
-
-            modal.classList.remove('pointer-events-none', 'opacity-0');
-            content.classList.remove('scale-90');
+            real.setAttribute('d', d);
         }
 
-        function closeModal() {
-            document.getElementById('modal').classList.add('pointer-events-none', 'opacity-0');
-            document.getElementById('modal-content').classList.add('scale-90');
-        }
-
-        async function validateTransaction(uid) {
-            if(!uid) return;
-            const item = budgetData.find(d => (d.uid || d.UID) === uid);
-            if(item) {
-                if(item.status) item.status = 'Validated';
-                if(item.Status) item.Status = 'Validated';
-            }
-            renderTimeline();
-            closeModal();
-
-            try {
-                await fetch(SCRIPT_URL, {
-                    method: 'POST',
-                    mode: 'no-cors',
-                    body: JSON.stringify({ action: 'validate', uid: uid })
-                });
-            } catch(e) { console.error("API Error"); }
-        }
-
-        window.addEventListener('resize', () => {
-            drawBudgetGuides();
-        });
-
-        fetchData();
+        window.addEventListener('resize', drawGuides);
+        loadData();
     </script>
 </body>
 </html>
